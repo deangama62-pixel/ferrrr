@@ -1,1 +1,249 @@
-print("subscribe")
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ESPEnabled = false
+local AimAssistEnabled = false
+local AimStrength = 0.15
+
+local Window = Rayfield:CreateWindow({
+	Name = "Universal Script By FerHakcs", -- Updated window title here
+	LoadingTitle = "Created by fer",
+	LoadingSubtitle = "ESP + Aim Assist",
+	ConfigurationSaving = {
+		Enabled = false
+	}
+})
+
+local MainTab = Window:CreateTab("Visuals", 4483362458)
+local CreditsTab = Window:CreateTab("Credits", 4483362458)
+
+-- CREDITS TAB UI
+CreditsTab:CreateButton({
+	Name = "YouTube: ferhackss",
+	Callback = function()
+		local ytLink = "https://youtube.com/@ferhackss?si=IlXD4RNOQsNRmgTO"
+		
+		if setclipboard then
+			setclipboard(ytLink)
+			Rayfield:Notify({
+				Title = "Link Copied!",
+				Content = "YouTube channel link copied to clipboard!",
+				Duration = 3,
+				Image = 4483362458,
+			})
+		else
+			Rayfield:Notify({
+				Title = "Error",
+				Content = "Your exploit doesn't support clipboard functions.",
+				Duration = 3,
+				Image = 4483362458,
+			})
+		end
+	end,
+})
+
+-- ESP FUNCTIONS
+
+local function CreateESP(player)
+	if player == LocalPlayer then return end
+	if player.Team == LocalPlayer.Team and LocalPlayer.Team ~= nil then return end
+	if not player.Character then return end
+
+	local char = player.Character
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+
+	if not hrp or not hum then return end
+
+	-- Highlight
+	if not char:FindFirstChild("OwnerHighlight") then
+		local h = Instance.new("Highlight")
+		h.Name = "OwnerHighlight"
+		h.FillTransparency = 0.5
+		h.Parent = char
+	end
+
+	-- Box
+	if not char:FindFirstChild("OwnerBox") then
+		local box = Instance.new("SelectionBox")
+		box.Name = "OwnerBox"
+		box.LineThickness = 0.05
+		box.Adornee = char
+		box.Parent = char
+	end
+
+	-- Billboard
+	if not hrp:FindFirstChild("OwnerInfo") then
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "OwnerInfo"
+		gui.Size = UDim2.new(0, 140, 0, 35) 
+		gui.StudsOffset = Vector3.new(0, 3, 0)
+		gui.AlwaysOnTop = true
+		gui.Parent = hrp
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, 0, 1, 0)
+		label.BackgroundTransparency = 1
+		label.TextScaled = false 
+		label.TextSize = 12
+		label.TextColor3 = Color3.fromRGB(255, 255, 255)
+		label.TextStrokeTransparency = 0
+		label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+		label.Font = Enum.Font.SourceSansBold
+		label.Parent = gui
+
+		RunService.RenderStepped:Connect(function()
+			if gui.Parent
+				and hum.Parent
+				and LocalPlayer.Character
+				and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+
+				if player.Team == LocalPlayer.Team and LocalPlayer.Team ~= nil then
+					gui.Enabled = false
+					if char:FindFirstChild("OwnerHighlight") then char.OwnerHighlight.Enabled = false end
+					if char:FindFirstChild("OwnerBox") then char.OwnerBox.Enabled = false end
+				else
+					gui.Enabled = true
+					if char:FindFirstChild("OwnerHighlight") then char.OwnerHighlight.Enabled = true end
+					if char:FindFirstChild("OwnerBox") then char.OwnerBox.Enabled = true end
+				end
+
+				local distance = math.floor(
+					(LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+				)
+
+				label.Text =
+					player.Name ..
+					" | H: " .. math.floor(hum.Health) ..
+					" | D: " .. distance
+			end
+		end)
+	end
+end
+
+local function RemoveESP(player)
+	if not player.Character then return end
+
+	local char = player.Character
+
+	if char:FindFirstChild("OwnerHighlight") then
+		char.OwnerHighlight:Destroy()
+	end
+
+	if char:FindFirstChild("OwnerBox") then
+		char.OwnerBox:Destroy()
+	end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if hrp and hrp:FindFirstChild("OwnerInfo") then
+		hrp.OwnerInfo:Destroy()
+	end
+end
+
+-- AIM ASSIST
+
+local function GetClosestTarget()
+	local Closest = nil
+	local ClosestDistance = math.huge
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			if player.Team == LocalPlayer.Team and LocalPlayer.Team ~= nil then continue end
+
+			local targetPart = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+			local hum = player.Character:FindFirstChildOfClass("Humanoid")
+
+			if targetPart and hum and hum.Health > 0 and hum.Parent == player.Character then
+				local pos, visible = Camera:WorldToViewportPoint(targetPart.Position)
+
+				if visible or (targetPart.Position - Camera.CFrame.Position).Magnitude < 150 then
+					local dist = (
+						Vector2.new(pos.X, pos.Y)
+						- Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+					).Magnitude
+
+					if dist < ClosestDistance then
+						ClosestDistance = dist
+						Closest = targetPart
+					end
+				end
+			end
+		end
+	end
+
+	return Closest
+end
+
+RunService.RenderStepped:Connect(function()
+	if not AimAssistEnabled then
+		return
+	end
+
+	local target = GetClosestTarget()
+
+	if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") then
+		if target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
+			local goal = CFrame.new(Camera.CFrame.Position, target.Position)
+			Camera.CFrame = Camera.CFrame:Lerp(goal, AimStrength)
+		end
+	end
+end)
+
+-- UI
+
+MainTab:CreateToggle({
+	Name = "Player ESP",
+	CurrentValue = false,
+	Flag = "ESP",
+	Callback = function(Value)
+		ESPEnabled = Value
+
+		for _, player in ipairs(Players:GetPlayers()) do
+			if Value then
+				CreateESP(player)
+			else
+				RemoveESP(player)
+			end
+		end
+	end
+})
+
+MainTab:CreateToggle({
+	Name = "Aim Assist",
+	CurrentValue = false,
+	Flag = "AimAssist",
+	Callback = function(Value)
+		AimAssistEnabled = Value
+	end
+})
+
+MainTab:CreateSlider({
+	Name = "Aim Strength",
+	Range = {1, 100},
+	Increment = 1,
+	Suffix = "%",
+	CurrentValue = 15,
+	Flag = "AimStrength",
+	Callback = function(Value)
+		AimStrength = Value / 100
+	end
+})
+
+local function MonitorPlayer(player)
+	player.CharacterAdded:Connect(function()
+		task.wait(1)
+		if ESPEnabled then
+			CreateESP(player)
+		end
+	end)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	MonitorPlayer(player)
+end
+
+Players.PlayerAdded:Connect(MonitorPlayer)
